@@ -103,6 +103,7 @@ class Alien {
     }
 
     restart() {
+        this.health = Math.floor(Math.pow(this.type, 1.333));
         this.alive = true;
         this.x = this.startX;
         this.y = -this.image.height/2;
@@ -113,6 +114,7 @@ class Alien {
         if (editing) {
             context.drawImage(this.image, this.startX - this.image.width/2, h - this.startTime - this.image.height/2);
         } else {
+            if (!this.alive) return;
             context.drawImage(this.image, this.x - this.image.width/2, this.y - this.image.height/2);
         }
     }
@@ -128,7 +130,7 @@ class Alien {
         } else {
 
             if (movementStats[this.type].homing) {
-                let angle = Math.atan2(mousePosition.x - this.x, mousePosition.y - this.y);
+                let angle = Math.atan2(player.x - this.x, player.y - this.y);
                 this.dx = movementStats[this.type].speed * Math.sin(angle);
                 this.dy = movementStats[this.type].speed;
             }
@@ -152,7 +154,7 @@ class Alien {
                         let y = this.y + this.image.height/2;
                         let angle = weaponStats[this.type].angleSpread * f;
                         if (weaponStats[this.type].homing) {
-                            angle += Math.atan2(mousePosition.x - this.x, mousePosition.y - this.y);
+                            angle += Math.atan2(player.x - this.x, player.y - this.y);
                         }
                         let dx = this.dx + 500 * Math.sin(angle);
                         let dy = this.dy + 500 * Math.cos(angle);

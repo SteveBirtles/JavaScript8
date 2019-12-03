@@ -48,7 +48,9 @@ function pageLoad() {
 
     loadBackground.then(() => {
         loadAlienImages.then(() => {
-            window.requestAnimationFrame(gameFrame);
+            loadPlayerImage.then(() => {
+                window.requestAnimationFrame(gameFrame);
+            });
         });
     });
 
@@ -56,6 +58,8 @@ function pageLoad() {
     window.addEventListener('beforeunload', event => {
         saveAliens();
     });
+
+    player = new Player();
 
 }
 
@@ -65,7 +69,7 @@ function gameFrame(timestamp) {
     const frameLength = (timestamp - lastTimestamp) / 1000;
     lastTimestamp = timestamp;
 
-    inputs();
+    inputs(frameLength);
     processes(frameLength);
     outputs();
 
@@ -73,7 +77,7 @@ function gameFrame(timestamp) {
 
 }
 
-function inputs() {
+function inputs(frameLength) {
 
     if (mouseClicked && mode == EDIT_MODE) {
         aliens.push(new Alien(selectedAlienType, mousePosition.x, mousePosition.snappedT));
@@ -89,9 +93,11 @@ function inputs() {
                 for (let alien of aliens) {
                     alien.restart();
                 }
+                player.restart(w/2, h-100);
             } else {
                 mode = EDIT_MODE;
                 projectiles = [];
+                explosions = [];
             }
             keyDown = true;
         }
@@ -128,21 +134,101 @@ function inputs() {
 
     }
 
+    if (player.alive && mode == PLAY_MODE) {
+
+        if (pressedKeys["ArrowUp"]) {
+            player.dy -= 2500*frameLength;
+            if (player.dy < -500) player.dy = -500;
+        } else if (pressedKeys["ArrowDown"]) {
+            player.dy += 2500*frameLength;
+            if (player.dy > 500) player.dy = 500;
+        } else {
+            player.dy *= 1 - 2 * frameLength;
+        }
+
+        if (pressedKeys["ArrowLeft"]) {
+            player.dx -= 2500*frameLength;
+            if (player.dx < -500) player.dx = -500;
+        } else if (pressedKeys["ArrowRight"]) {
+            player.dx += 2500*frameLength;
+            if (player.dx > 500) player.dx = 500;
+        } else {
+            player.dx *= 1 - 2 * frameLength;
+        }
+
+        if (pressedKeys[" "]) {
+            for (let r = 0; r < playerWeapons.length; r++) {
+                if (player.reloadTimers[r] < 0) {
+                    for (let n = 1; n <= playerWeapons[r].count; n++) {
+                        let f = -(playerWeapons[r].count-1) + (n-1)*2
+                        let x = player.x + playerWeapons[r].xSpread * f;
+                        let y = player.y + playerImage.height/2;
+                        let angle = Math.PI + playerWeapons[r].angleSpread * f;
+                        let dx = 750 * Math.sin(angle);
+                        let dy = 750 * Math.cos(angle);
+                        projectiles.push(new Projectile(x, y, dx, dy, true, 0));
+                    }
+                    player.reloadTimers[r] = 1;
+                }
+            }
+        }
+
+    }
+
+}
+
+function seperation(entity1, entity2) {
+
+    return Math.sqrt(Math.pow(entity1.x - entity2.x, 2) + Math.pow(entity1.y - entity2.y, 2));
+
 }
 
 function processes(frameLength) {
 
     if (mode == PLAY_MODE) {
 
+        player.update(frameLength);
+
         for (let alien of aliens) {
             alien.update(frameLength);
         }
 
+        for (let explosion of explosions) {
+            explosion.update(frameLength);
+        }
+
         for (let projectile of projectiles) {
             projectile.update(frameLength);
+            if (projectile.friendly) {
+                for (let alien of aliens) {
+                    if (!alien.alive || alien.spawnTimer > 0) continue;
+                    if (seperation(alien, projectile) < alienImages[alien.type].height/2 + 5) {
+                        alien.health -= 1;
+                        projectile.expired = true;
+                        if (alien.health <= 0) {
+                            alien.alive = false;
+                            explosions.push(new Explosion(alien.x, alien.y, alienImages[alien.type].width*2));
+                        } else {
+                            explosions.push(new Explosion(projectile.x, projectile.y, 20));
+                        }
+                    }
+                }
+            } else {
+                if (player.alive && seperation(player, projectile) < playerImage.height/2 + 5) {
+                    projectile.expired = true;
+                    player.health -= 1;
+                    if (player.health <= 0) {
+                        explosions.push(new Explosion(player.x, player.y, 300));
+                        player.alive = false;
+                    } else {
+                        explosions.push(new Explosion(projectile.x, projectile.y, 20));
+                    }
+                }
+            }
         }
 
         projectiles = projectiles.filter(p => !p.expired);
+        explosions = explosions.filter(e => !e.expired);
 
     }
 
@@ -176,6 +262,10 @@ function outputs() {
         }
     }
 
+    if (mode == PLAY_MODE) {
+        player.draw(context);
+    }
+
     for (let alien of aliens) {
         alien.draw(context, mode == EDIT_MODE);
 
@@ -190,9 +280,26 @@ function outputs() {
     }
 
     if (mode == PLAY_MODE) {
+
+        context.globalCompositeOperation = "lighter";
+
         for (let projectile of projectiles) {
             projectile.draw(context);
         }
+
+        for (let explosion of explosions) {
+            explosion.draw(context);
+        }
+
+        if (player.alive) {
+            context.fillStyle = '#00FF00';
+            context.fillRect(100, h-50, (w-200)*(player.health/100), 15);
+            context.fillStyle = '#220000';
+            context.fillRect(100 + (w-200)*(player.health/100), h-50, (w-200)*(1 - player.health/100), 15);
+        }
+
+        context.globalCompositeOperation = "source-over";
+
     }
 
     if (mode == EDIT_MODE) {
