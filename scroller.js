@@ -49,7 +49,10 @@ function pageLoad() {
     loadBackground.then(() => {
         loadAlienImages.then(() => {
             loadPlayerImage.then(() => {
-                window.requestAnimationFrame(gameFrame);
+                loadExplosionImage.then(() => {
+                    player = new Player();
+                    window.requestAnimationFrame(gameFrame);
+                });
             });
         });
     });
@@ -58,8 +61,6 @@ function pageLoad() {
     window.addEventListener('beforeunload', event => {
         saveAliens();
     });
-
-    player = new Player();
 
 }
 
@@ -128,6 +129,14 @@ function inputs(frameLength) {
             keyDown = true;
         }
 
+    } else if (pressedKeys["End"]) {
+
+      if (!keyDown) {
+            aliens = [];
+            saveAliens();
+            keyDown = true;
+      }
+
     } else {
 
         keyDown = false;
@@ -156,8 +165,11 @@ function inputs(frameLength) {
             player.dx *= 1 - 2 * frameLength;
         }
 
-        if (pressedKeys[" "]) {
+        if (pressedKeys[" "] || pressedKeys["x"] || pressedKeys["z"]) {
             for (let r = 0; r < playerWeapons.length; r++) {
+                if (r === 0 && !pressedKeys[" "]) continue;
+                if (r === 1 && !pressedKeys["x"]) continue;
+                if (r === 2 && !pressedKeys["z"]) continue;
                 if (player.reloadTimers[r] < 0) {
                     for (let n = 1; n <= playerWeapons[r].count; n++) {
                         let f = -(playerWeapons[r].count-1) + (n-1)*2
